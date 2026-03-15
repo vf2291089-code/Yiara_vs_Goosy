@@ -97,8 +97,13 @@
             <div>Уровень: <span id="uiLevel" class="text-yellow-300">1</span></div>
             <div>🥃 <span id="uiBottles">0</span></div>
         </div>
-        <!-- Чат лог -->
-        <div id="chatLog" style="position: absolute; top: 60px; left: 10px; width: 320px; z-index: 50; pointer-events: none; display: flex; flex-direction: column; gap: 4px;">
+        <!-- Чат лог (сильно уменьшен) -->
+        <div id="chatLog" style="position: absolute; top: 60px; left: 10px; width: 220px; transform: scale(0.65); transform-origin: top left; z-index: 50; pointer-events: none; display: flex; flex-direction: column; gap: 4px;">
+        </div>
+        
+        <!-- Джойстик -->
+        <div id="joystick-zone" style="position: absolute; bottom: 30px; right: 30px; width: 120px; height: 120px; background: rgba(0,0,0,0.3); border-radius: 50%; border: 3px solid rgba(255,255,255,0.4); z-index: 60; touch-action: none; pointer-events: auto;">
+            <div id="joystick-knob" style="position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"></div>
         </div>
     </div>
 
@@ -215,6 +220,12 @@
     let pointer = { x: 0, y: 0 };
     let camera = { x: 0, y: 0 };
     let frameCount = 0;
+    const ZOOM = 0.55; // Множитель отдаления камеры
+
+    // Переменные управления
+    let joyActive = false;
+    let joyData = { x: 0, y: 0 };
+    let pointerActive = false;
 
     // Сущности
     let player;
@@ -306,14 +317,6 @@
             }
             if (this.slowedTimer > 0) currentSpeed *= 0.4; // замедление от яйца
 
-            // Направление к пальцу/мыши (с учетом камеры)
-            let targetX = pointer.x + camera.x;
-            let targetY = pointer.y + camera.y;
-
-            let dx = targetX - this.x;
-            let dy = targetY - this.y;
-            let dist = Math.hypot(dx, dy);
-
             // Пьяная физика: снизили влияние и поставили лимит
             let wobbleX = 0;
             let wobbleY = 0;
@@ -323,15 +326,37 @@
                 wobbleY = Math.cos(frameCount * 0.04) * wobbleIntensity;
             }
 
-            if (dist > 5) {
-                let moveX = (dx / dist) * currentSpeed + wobbleX;
-                let moveY = (dy / dist) * currentSpeed + wobbleY;
-                
-                // Плавное ускорение (lerp)
-                this.vx += (moveX - this.vx) * 0.1;
-                this.vy += (moveY - this.vy) * 0.1;
+            // Управление: Джойстик или Палец/Мышь
+            let isMoving = false;
+            let targetVx = 0;
+            let targetVy = 0;
+
+            if (joyActive && (Math.abs(joyData.x) > 0.05 || Math.abs(joyData.y) > 0.05)) {
+                // Движение с помощью джойстика
+                targetVx = joyData.x * currentSpeed + wobbleX;
+                targetVy = joyData.y * currentSpeed + wobbleY;
+                isMoving = true;
+            } else if (pointerActive) {
+                // Движение к указателю (удерживание пальца/мыши на экране)
+                let targetX = pointer.x + camera.x;
+                let targetY = pointer.y + camera.y;
+                let dx = targetX - this.x;
+                let dy = targetY - this.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > 5) {
+                    targetVx = (dx / dist) * currentSpeed + wobbleX;
+                    targetVy = (dy / dist) * currentSpeed + wobbleY;
+                    isMoving = true;
+                }
+            }
+
+            // Применение скорости
+            if (isMoving) {
+                this.vx += (targetVx - this.vx) * 0.15; // Плавное ускорение
+                this.vy += (targetVy - this.vy) * 0.15;
             } else {
-                this.vx *= 0.8;
+                this.vx *= 0.8; // Плавная остановка
                 this.vy *= 0.8;
             }
 
@@ -354,64 +379,9 @@
                 }
             }
 
-            if (nearestGooseDist < 150) {
-                this.panicTimer++;
-            } else {
-                this.panicTimer = 0;
-            }
-
-            // Коллизия с препятствиями (водой)
-            let nextX = this.x + this.vx;
-            let nextY = this.y + this.vy;
-            let canMoveX = true;
-            let canMoveY = true;
-
-            for (let obs of obstacles) {
-                if (obs.type === 'water') {
-                    if (Math.hypot(nextX - obs.x, this.y - obs.y) < this.size + obs.size) canMoveX = false;
-                    if (Math.hypot(this.x - obs.x, nextY - obs.y) < this.size + obs.size) canMoveY = false;
-                }
-            }
-
-            if (canMoveX) this.x += this.vx;
-            if (canMoveY) this.y += this.vy;
-
-            // Ограничение движения забором (Границы карты)
-            this.x = Math.max(WORLD_MIN_X + this.size, Math.min(WORLD_MAX_X - this.size, this.x));
-            this.y = Math.max(WORLD_MIN_Y + this.size, Math.min(WORLD_MAX_Y - this.size, this.y));
-
-            // Случайные фразочки Яры
-            this.randomPhraseTimer--;
-            if (this.randomPhraseTimer <= 0) {
-                this.randomPhraseTimer = 400 + Math.random() * 600; // Раз в 7-15 секунд
-                addBubble(this, phrasesYaraRandom[Math.floor(Math.random() * phrasesYaraRandom.length)], '#ffffff');
-            }
-
-            // Магия волшебной палочки
-            if (equippedWand === 'magic_wand') {
-                this.wandTimer--;
-                if (this.wandTimer <= 0) {
-                    this.wandTimer = 1200; // 20s
-                    let spell = Math.floor(Math.random() * 4);
-                    if (spell === 0) {
-                        this.speedBoostTimer = 300; // 5s
-                        addBubble(this, "Ускорятус!", '#a855f7');
-                    } else if (spell === 1) {
-                        let g = getNearestGoose(this.x, this.y);
-                        if (g) { g.stunTimer = 180; addBubble(this, "Остолбеней!", '#a855f7'); }
-                    } else if (spell === 2) {
-                        let itm = getNearestItem(this.x, this.y);
-                        if (itm) { itm.isAccio = true; addBubble(this, "Акцио!", '#a855f7'); }
-                    } else if (spell === 3) {
-                        let g = getNearestGoose(this.x, this.y);
-                        if (g) { g.isDead = true; addBubble(this, "Авада Кедавра!", '#22c55e'); }
-                    }
-                }
-            }
-
-            // Камера следит за игроком
-            camera.x = this.x - w / 2;
-            camera.y = this.y - h / 2;
+            // Камера следит за игроком (с учетом зума)
+            camera.x = this.x - (w / 2) / ZOOM;
+            camera.y = this.y - (h / 2) / ZOOM;
         }
 
         draw() {
@@ -1081,20 +1051,104 @@
         }
     }
 
-    // --- УПРАВЛЕНИЕ ---
+    // --- УПРАВЛЕНИЕ УКАЗАТЕЛЕМ (Палец/Мышь) ---
     function updatePointer(e) {
         if (gameState !== 'playing') return;
-        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        pointer.x = clientX;
-        pointer.y = clientY;
+        let clientX, clientY;
+        
+        // Надежное определение координат для ПК и мобильных
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        if (clientX === undefined || clientY === undefined) return;
+
+        pointer.x = clientX / ZOOM;
+        pointer.y = clientY / ZOOM;
     }
     
-    window.addEventListener('mousemove', updatePointer);
-    window.addEventListener('touchmove', updatePointer);
-    window.addEventListener('touchstart', (e) => {
-        if(gameState === 'playing') updatePointer(e);
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.closest('#joystick-zone') || e.target.closest('.btn')) return;
+        pointerActive = true;
+        updatePointer(e);
     });
+    window.addEventListener('mousemove', (e) => {
+        if (pointerActive) updatePointer(e);
+    });
+    window.addEventListener('mouseup', () => pointerActive = false);
+
+    window.addEventListener('touchstart', (e) => {
+        if (e.target.closest('#joystick-zone') || e.target.closest('.btn')) return;
+        pointerActive = true;
+        updatePointer(e);
+    }, {passive: false});
+    window.addEventListener('touchmove', (e) => {
+        if (pointerActive) updatePointer(e);
+    }, {passive: false});
+    window.addEventListener('touchend', () => pointerActive = false);
+
+    // --- ЛОГИКА ДЖОЙСТИКА ---
+    const joyZone = document.getElementById('joystick-zone');
+    const joyKnob = document.getElementById('joystick-knob');
+
+    function handleJoyStart(e) {
+        if (gameState !== 'playing') return;
+        joyActive = true;
+        handleJoyMove(e);
+    }
+
+    function handleJoyMove(e) {
+        if (!joyActive) return;
+        if (e.cancelable) e.preventDefault(); // Запрет скролла экрана при игре
+        
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        if (clientX === undefined || clientY === undefined) return;
+        
+        let rect = joyZone.getBoundingClientRect();
+        let centerX = rect.left + rect.width / 2;
+        let centerY = rect.top + rect.height / 2;
+        
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
+        let dist = Math.hypot(dx, dy);
+        let maxDist = rect.width / 2 - 25; // Ограничение ползунка
+        
+        if (dist > maxDist) {
+            dx = (dx / dist) * maxDist;
+            dy = (dy / dist) * maxDist;
+        }
+        
+        joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        joyData.x = dx / maxDist;
+        joyData.y = dy / maxDist;
+    }
+
+    function handleJoyEnd(e) {
+        joyActive = false;
+        joyData = { x: 0, y: 0 };
+        joyKnob.style.transform = `translate(-50%, -50%)`;
+    }
+
+    joyZone.addEventListener('mousedown', handleJoyStart);
+    document.addEventListener('mousemove', handleJoyMove);
+    document.addEventListener('mouseup', handleJoyEnd);
+    
+    joyZone.addEventListener('touchstart', handleJoyStart, {passive: false});
+    document.addEventListener('touchmove', handleJoyMove, {passive: false});
+    document.addEventListener('touchend', handleJoyEnd);
 
     // --- ИГРОВОЙ ЦИКЛ ---
     function startGame() {
@@ -1274,14 +1328,18 @@
 
         if (gameState !== 'playing') return;
 
+        // Применяем отдаление камеры
+        ctx.save();
+        ctx.scale(ZOOM, ZOOM);
+
         // Рисуем сетку земли для понимания движения
         ctx.save();
         ctx.translate(-camera.x % 100, -camera.y % 100);
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.lineWidth = 2;
-        for(let i=-100; i<w+100; i+=100) {
-            ctx.beginPath(); ctx.moveTo(i, -100); ctx.lineTo(i, h+100); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(-100, i); ctx.lineTo(w+100, i); ctx.stroke();
+        for(let i=-100; i< (w/ZOOM) +100; i+=100) {
+            ctx.beginPath(); ctx.moveTo(i, -100); ctx.lineTo(i, (h/ZOOM)+100); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-100, i); ctx.lineTo((w/ZOOM)+100, i); ctx.stroke();
         }
         ctx.restore();
 
@@ -1331,6 +1389,8 @@
         drawParticles();
         drawBubbles();
         
+        ctx.restore(); // Сбрасываем ZOOM, чтобы элементы интерфейса рисовались в оригинальном размере
+
         // Интро гуся
         if (introTimer > 0) {
             introTimer--;
