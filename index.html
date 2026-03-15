@@ -13,6 +13,7 @@
             background-color: #4ade80; /* Цвет травы */
             font-family: 'Comic Sans MS', 'Arial', sans-serif;
             touch-action: none; /* Запрет скролла на мобильных */
+            user-select: none;
         }
         #gameCanvas {
             display: block;
@@ -97,7 +98,8 @@
             <div>Уровень: <span id="uiLevel" class="text-yellow-300">1</span></div>
             <div>🥃 <span id="uiBottles">0</span></div>
         </div>
-        <!-- Чат лог (сильно уменьшен) -->
+        
+        <!-- Чат лог -->
         <div id="chatLog" style="position: absolute; top: 60px; left: 10px; width: 220px; transform: scale(0.65); transform-origin: top left; z-index: 50; pointer-events: none; display: flex; flex-direction: column; gap: 4px;">
         </div>
         
@@ -137,8 +139,7 @@
 
 <script>
     // --- НАСТРОЙКИ ФОТО ---
-    // ЗАМЕНИ URL НИЖЕ НА ССЫЛКУ С ФОТОГРАФИЕЙ ГОЛОВЫ ДЕВУШКИ
-    const HEAD_IMAGE_URL = 'https://ui-avatars.com/api/?name=Yara&background=ffb6c1&color=fff&rounded=true&size=128'; 
+    const HEAD_IMAGE_URL = 'face.png'; 
     const headImg = new Image();
     headImg.src = HEAD_IMAGE_URL;
 
@@ -151,22 +152,20 @@
     
     const phrasesYaraRandom = [
         "Эх Эля, за что ты так...", "Да я так то ваще не пью", "Я что в игре?",
-        "Девочки, я больше не могу!", "Где мой кальян?", "Ой, ноготь сломала!",
+        "Тёть, Маш, спаси меня!", " ДА чё за бред то?", "Ой, ноготь сломала!",
         "Гуси, вы вообще нормальные?", "До инфаркта недалеко!", "Вызовите мне бизнес-такси!",
         "Я девочка, мне можно!", "Слишком много кардио...", "А где кнопка паузы?!",
         "Мама, забери меня отсюда!", "Я же только один бокальчик хотела...", 
-        "Главное — держать спину прямо!", "Никакой личной жизни с птицами!",
+        "Главное — держать спину прямо!", " Что бы на моём месте сделал Сергей Лазарев?",
         "Кто придумал эти правила?!", "Я сейчас буду ругаться матом!",
         "У меня лапки! Ой, ручки!", "Вот это вечериночка..."
     ];
 
-    const phrasesScared = [
-        "Ааа, пернатый!", "Кыш, гусь!", "Не щипайся!", "Спасите!", "Я невкусная!"
-    ];
+    const phrasesScared = ["Ааа, пернатый!", "Кыш, гусь!", "Не щипайся!", "Спасите!", "Я невкусная!"];
     const phrasesGoose = [
         "Яра, отдай виски!", "Га-га-га, Ярослава!", "Стой, Яра, поговорим!",
         "Ярослава, ты слишком много пьёшь!", "От меня не убежишь!", "Шиш тебе, а не праздник!",
-        "Верни стеклотару, Яра!", "Яра, по нам с тобой написали диплом.", "Что ещё за семейники? вы чё?!",
+        "Верни стеклотару, Яра!","В самое сердце! На пораженье!", "Яра, по нам с тобой написали диплом.", "Что ещё за семейники? вы чё?!",
         "Шшшшшш....", "Я гусь, я тебя кусь-кусь", "Яра, иди чё то покажу", "Подойди как по ближе.",
         "Смотри чё покажу"
     ];
@@ -183,21 +182,20 @@
         'pitchfork': ['Ат-тя-тя!', 'Иди ка сюда!', 'Щя я тебя вилами то...!!!'],
         'lasso': ['Ловись, рыбка!', 'Арканю!', 'Сюда иди!', 'Ща свяжу!', 'Лассо-бросо!']
     };
-
     const phrasesLassoHit = ['Ой, связали!', 'БДСМ какой-то!', 'Отпусти, пернатый!', 'Я не корова!', 'Где мой адвокат?!'];
 
     // --- ИГРОВЫЕ ДАННЫЕ И СОСТОЯНИЯ ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Границы мира (карта размером 4000x4000)
+    // Границы мира
     const WORLD_MIN_X = -2000;
     const WORLD_MAX_X = 2000;
     const WORLD_MIN_Y = -2000;
     const WORLD_MAX_Y = 2000;
 
     let w, h;
-    let gameState = 'menu'; // menu, playing, shop, gameover
+    let gameState = 'menu';
     let globalBottles = parseInt(localStorage.getItem('yara_bottles')) || 0;
     
     // Магазин
@@ -214,15 +212,15 @@
     let equippedVehicle = localStorage.getItem('yara_equippedVehicle') || 'none';
     let equippedWand = localStorage.getItem('yara_equippedWand') || 'none';
 
-    // Игровые переменные раунда
+    // Игровые переменные
     let level = 1;
     let bottlesCollectedThisRound = 0;
     let pointer = { x: 0, y: 0 };
     let camera = { x: 0, y: 0 };
     let frameCount = 0;
-    const ZOOM = 0.55; // Множитель отдаления камеры
+    const ZOOM = 0.55;
 
-    // Переменные управления
+    // Управление
     let joyActive = false;
     let joyData = { x: 0, y: 0 };
     let pointerActive = false;
@@ -230,18 +228,17 @@
     // Сущности
     let player;
     let geese = [];
-    let items = []; // бутылки
-    let obstacles = []; // кусты, вода
-    let traps = []; // яйца
+    let items = []; 
+    let obstacles = []; 
+    let traps = []; 
     let particles = [];
-    let bubbles = []; // Облачка текста
-    let bullets = []; // Пули
+    let bubbles = []; 
+    let bullets = []; 
     let grasses = [];
     let stones = [];
     let introTimer = 0;
     let introText = '';
 
-    // Инициализация размеров
     function resize() {
         w = canvas.width = window.innerWidth;
         h = canvas.height = window.innerHeight;
@@ -287,41 +284,41 @@
             this.fallenTimer = 0;
             this.legsPhase = 0;
             this.panicTimer = 0;
-            this.randomPhraseTimer = 300 + Math.random() * 600; // Таймер случайных фраз Яры
-            this.wandTimer = 1200; // Раз в 20 секунд (при 60fps)
+            this.randomPhraseTimer = 300 + Math.random() * 600;
+            this.wandTimer = 1200; // 20 сек
             this.speedBoostTimer = 0;
         }
 
         update() {
-            // Если упала пьяненькая
+            // Если упала пьяненькая или от яйца/лассо
             if (this.fallenTimer > 0) {
                 this.fallenTimer--;
                 this.vx *= 0.8;
                 this.vy *= 0.8;
                 this.x += this.vx;
                 this.y += this.vy;
-                camera.x = this.x - w / 2;
-                camera.y = this.y - h / 2;
+                camera.x = this.x - (w / 2) / ZOOM;
+                camera.y = this.y - (h / 2) / ZOOM;
                 return;
             }
 
             if (this.slowedTimer > 0) this.slowedTimer--;
 
-            // Вычисляем бонус от транспорта и магии
+            // Бонус от транспорта и магии
             let currentSpeed = this.baseSpeed;
             if (equippedVehicle === 'rollers') currentSpeed *= 1.5;
             if (equippedVehicle === 'bike') currentSpeed *= 2.2;
             if (this.speedBoostTimer > 0) {
                 this.speedBoostTimer--;
-                currentSpeed *= 1.8; // Бонус от заклинания Ускорятус
+                currentSpeed *= 1.8;
             }
-            if (this.slowedTimer > 0) currentSpeed *= 0.4; // замедление от яйца
+            if (this.slowedTimer > 0) currentSpeed *= 0.4;
 
-            // Пьяная физика: снизили влияние и поставили лимит
+            // Пьяная физика
             let wobbleX = 0;
             let wobbleY = 0;
             if (this.drunkLevel > 0) {
-                let wobbleIntensity = Math.min(this.drunkLevel * 0.4, 6); // Теперь шатает слабее
+                let wobbleIntensity = Math.min(this.drunkLevel * 0.4, 6);
                 wobbleX = Math.sin(frameCount * 0.05) * wobbleIntensity;
                 wobbleY = Math.cos(frameCount * 0.04) * wobbleIntensity;
             }
@@ -332,12 +329,10 @@
             let targetVy = 0;
 
             if (joyActive && (Math.abs(joyData.x) > 0.05 || Math.abs(joyData.y) > 0.05)) {
-                // Движение с помощью джойстика
                 targetVx = joyData.x * currentSpeed + wobbleX;
                 targetVy = joyData.y * currentSpeed + wobbleY;
                 isMoving = true;
             } else if (pointerActive) {
-                // Движение к указателю (удерживание пальца/мыши на экране)
                 let targetX = pointer.x + camera.x;
                 let targetY = pointer.y + camera.y;
                 let dx = targetX - this.x;
@@ -351,12 +346,11 @@
                 }
             }
 
-            // Применение скорости
             if (isMoving) {
-                this.vx += (targetVx - this.vx) * 0.15; // Плавное ускорение
+                this.vx += (targetVx - this.vx) * 0.15;
                 this.vy += (targetVy - this.vy) * 0.15;
             } else {
-                this.vx *= 0.8; // Плавная остановка
+                this.vx *= 0.8;
                 this.vy *= 0.8;
             }
 
@@ -368,10 +362,31 @@
                 this.legsPhase = 0;
             }
 
+            // Коллизия с препятствиями (водой)
+            let nextX = this.x + this.vx;
+            let nextY = this.y + this.vy;
+            let canMoveX = true;
+            let canMoveY = true;
+
+            for (let obs of obstacles) {
+                if (obs.type === 'water') {
+                    if (Math.hypot(nextX - obs.x, this.y - obs.y) < this.size + obs.size) canMoveX = false;
+                    if (Math.hypot(this.x - obs.x, nextY - obs.y) < this.size + obs.size) canMoveY = false;
+                }
+            }
+
+            if (canMoveX) this.x += this.vx;
+            if (canMoveY) this.y += this.vy;
+
+            // Ограничение движения забором
+            this.x = Math.max(WORLD_MIN_X + this.size, Math.min(WORLD_MAX_X - this.size, this.x));
+            this.y = Math.max(WORLD_MIN_Y + this.size, Math.min(WORLD_MAX_Y - this.size, this.y));
+
             // Паника
             let nearestGooseDist = Infinity;
             let nearestGoose = null;
             for (let g of geese) {
+                if(g.isDead) continue;
                 let d = Math.hypot(g.x - this.x, g.y - this.y);
                 if (d < nearestGooseDist) {
                     nearestGooseDist = d;
@@ -379,7 +394,41 @@
                 }
             }
 
-            // Камера следит за игроком (с учетом зума)
+            if (nearestGooseDist < 150) {
+                this.panicTimer++;
+            } else {
+                this.panicTimer = 0;
+            }
+
+            // Случайные фразочки Яры
+            this.randomPhraseTimer--;
+            if (this.randomPhraseTimer <= 0) {
+                this.randomPhraseTimer = 400 + Math.random() * 600;
+                addBubble(this, phrasesYaraRandom[Math.floor(Math.random() * phrasesYaraRandom.length)], '#ffffff');
+            }
+
+            // Магия
+            if (equippedWand === 'magic_wand') {
+                this.wandTimer--;
+                if (this.wandTimer <= 0) {
+                    this.wandTimer = 1200; // 20s
+                    let spell = Math.floor(Math.random() * 4);
+                    if (spell === 0) {
+                        this.speedBoostTimer = 300;
+                        addBubble(this, "Ускорятус!", '#a855f7');
+                    } else if (spell === 1) {
+                        let g = getNearestGoose(this.x, this.y);
+                        if (g) { g.stunTimer = 180; addBubble(this, "Остолбеней!", '#a855f7'); }
+                    } else if (spell === 2) {
+                        let itm = getNearestItem(this.x, this.y);
+                        if (itm) { itm.isAccio = true; addBubble(this, "Акцио!", '#a855f7'); }
+                    } else if (spell === 3) {
+                        let g = getNearestGoose(this.x, this.y);
+                        if (g) { g.isDead = true; addBubble(this, "Авада Кедавра!", '#22c55e'); }
+                    }
+                }
+            }
+
             camera.x = this.x - (w / 2) / ZOOM;
             camera.y = this.y - (h / 2) / ZOOM;
         }
@@ -388,33 +437,30 @@
             ctx.save();
             ctx.translate(this.x - camera.x, this.y - camera.y);
             
-            // Вращение в сторону движения для эффекта шатания
             let angle = Math.atan2(this.vy, this.vx);
             if (Math.hypot(this.vx, this.vy) > 0.5) {
                  ctx.rotate(Math.sin(frameCount * 0.1) * 0.2 * (1 + this.drunkLevel*0.1));
             }
             
-            // Споткнулась и лежит
             if (this.fallenTimer > 0) {
-                ctx.rotate(Math.PI / 2); // Поворот на бок
+                ctx.rotate(Math.PI / 2);
             }
 
             // Отрисовка шеи
             ctx.fillStyle = '#fca5a5';
             ctx.fillRect(-3, -22, 6, 10);
 
-            // Отрисовка ног (кожа) и ботиночек
+            // Отрисовка ног и ботиночек
             ctx.fillStyle = '#fca5a5';
             let swing = Math.sin(this.legsPhase) * 10;
             
-            // Левая нога
+            // Левая
             ctx.beginPath(); ctx.roundRect(-8, 10 + swing, 6, 15, 3); ctx.fill(); 
             if (equippedVehicle === 'none') {
-                ctx.fillStyle = '#1f2937'; // Цвет ботинок
+                ctx.fillStyle = '#1f2937';
                 ctx.beginPath(); ctx.roundRect(-9, 22 + swing, 8, 5, 2); ctx.fill();
             }
-            
-            // Правая нога
+            // Правая
             ctx.fillStyle = '#fca5a5';
             ctx.beginPath(); ctx.roundRect(2, 10 - swing, 6, 15, 3); ctx.fill();  
             if (equippedVehicle === 'none') {
@@ -435,49 +481,44 @@
                 ctx.beginPath(); ctx.arc(8, 15 - swing, 4, 0, Math.PI*2); ctx.fill();
             }
 
-            // Отрисовка платья/тела
-            let dressColor = '#ef4444'; // Красное по умолчанию
+            // Отрисовка платья
+            let dressColor = '#ef4444';
             let skinItem = shopItems.find(i => i.id === equippedSkin);
             if (skinItem) dressColor = skinItem.color;
 
-            // Детализированное платье
             ctx.fillStyle = dressColor;
             ctx.beginPath();
-            ctx.moveTo(-6, -10); // плечи
+            ctx.moveTo(-6, -10);
             ctx.lineTo(6, -10);
-            ctx.quadraticCurveTo(15, 5, 12, 15); // правый изгиб
-            ctx.lineTo(-12, 15);                 // низ
-            ctx.quadraticCurveTo(-15, 5, -6, -10); // левый изгиб
+            ctx.quadraticCurveTo(15, 5, 12, 15);
+            ctx.lineTo(-12, 15);
+            ctx.quadraticCurveTo(-15, 5, -6, -10);
             ctx.closePath();
             ctx.fill();
 
-            // Пояс на платье
+            // Пояс
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.fillRect(-9, 0, 18, 3);
 
             // Отрисовка рук
             ctx.fillStyle = '#fca5a5';
             if (this.panicTimer > 0) {
-                // Паника - машет руками
                 let armSwing = Math.sin(frameCount * 0.5) * 15;
                 ctx.save(); ctx.translate(-15, -5); ctx.rotate(-Math.PI/4 + armSwing*0.05); ctx.beginPath(); ctx.roundRect(-4, 0, 8, 18, 4); ctx.fill(); ctx.restore();
                 ctx.save(); ctx.translate(15, -5); ctx.rotate(Math.PI/4 - armSwing*0.05); ctx.beginPath(); ctx.roundRect(-4, 0, 8, 18, 4); ctx.fill();
                 
-                // Волшебная палочка в правой руке при панике
                 if (equippedWand === 'magic_wand') {
                     ctx.fillStyle = '#451a03'; ctx.fillRect(-1, 10, 2, 15);
                     ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(0, 25, 3 + Math.sin(frameCount*0.2), 0, Math.PI*2); ctx.fill();
                 }
                 ctx.restore();
             } else {
-                // Обычные руки (двигаются при беге в противофазе)
                 ctx.beginPath(); ctx.roundRect(-18, -5 - swing, 6, 15, 3); ctx.fill();
                 
                 ctx.save();
                 ctx.translate(12, -5 + swing);
                 ctx.beginPath(); ctx.roundRect(0, 0, 6, 15, 3); ctx.fill();
                 
-                // Волшебная палочка в правой руке
                 if (equippedWand === 'magic_wand') {
                     ctx.fillStyle = '#451a03'; ctx.fillRect(2, 5, 3, 18);
                     ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(3.5, 23, 3 + Math.sin(frameCount*0.2), 0, Math.PI*2); ctx.fill();
@@ -485,7 +526,7 @@
                 ctx.restore();
             }
 
-            // Отрисовка головы (заглушка или фото)
+            // Голова
             ctx.save();
             ctx.beginPath();
             ctx.arc(0, -20, 18, 0, Math.PI * 2);
@@ -493,7 +534,6 @@
             try {
                 ctx.drawImage(headImg, -18, -38, 36, 36);
             } catch(e) {
-                // Запасной вариант, если фото не загрузилось
                 ctx.fillStyle = '#fca5a5';
                 ctx.fill();
             }
@@ -516,59 +556,48 @@
             this.faceTimer = 0;
             this.weaponChangeTimer = 0;
             this.talkCooldown = Math.random() * 300;
-            this.phraseTimer = Math.random() * 600; // Таймер фраз (10 сек)
-            this.eggTimer = 1800 + Math.random() * 600; // Таймер яиц (30 сек)
-            this.dashFrames = 0; // Для рывка с вилами
+            this.phraseTimer = Math.random() * 600;
+            this.eggTimer = 1800 + Math.random() * 600;
+            this.dashFrames = 0; 
             
-            // Для стрельбы
             this.shotsToFire = 0;
             this.shootCooldown = 0;
 
-            // Магические состояния
             this.isDead = false;
             this.stunTimer = 0;
         }
 
         update() {
-            if (this.isDead) {
-                this.faceType = 4; // Мертвый
-                return;
-            }
-            if (this.stunTimer > 0) {
-                this.stunTimer--;
-                return; // Заморожен
-            }
+            if (this.isDead) { this.faceType = 4; return; }
+            if (this.stunTimer > 0) { this.stunTimer--; return; }
 
             let dx = player.x - this.x;
             let dy = player.y - this.y;
             let dist = Math.hypot(dx, dy);
 
-            let speed = this.baseSpeed + (level * 0.1); // Гуси ускоряются с уровнями
-            
-            // Рывок, если достал вилы
+            let speed = this.baseSpeed + (level * 0.1);
             if (this.dashFrames > 0) {
                 this.dashFrames--;
                 speed *= 3.5; 
             }
             
-            // Обход воды (очень примитивный)
             let moveX = (dx / dist) * speed;
             let moveY = (dy / dist) * speed;
 
             this.x += moveX;
             this.y += moveY;
 
-            // Гуси тоже не могут выходить за забор
+            // Ограничение забором
             this.x = Math.max(WORLD_MIN_X + this.size, Math.min(WORLD_MAX_X - this.size, this.x));
             this.y = Math.max(WORLD_MIN_Y + this.size, Math.min(WORLD_MAX_Y - this.size, this.y));
 
             if (this.talkCooldown > 0) this.talkCooldown--;
 
-            // Стрельба и Лассо
+            // Стрельба / Лассо
             if ((this.weaponType === 'pistol' || this.weaponType === 'rifle' || this.weaponType === 'lasso') && this.shotsToFire > 0) {
                 this.shootCooldown--;
                 if (this.shootCooldown <= 0) {
-                    this.shootCooldown = (this.weaponType === 'rifle') ? 30 : 60; // 0.5s для автомата, 1s для пистолета
+                    this.shootCooldown = (this.weaponType === 'rifle') ? 30 : 60;
                     this.shotsToFire--;
                     let angle = Math.atan2(player.y - this.y, player.x - this.x);
                     let isLasso = this.weaponType === 'lasso';
@@ -584,18 +613,18 @@
                 }
             }
 
-            // Ловушки-яйца раз в 30 секунд
+            // Ловушки
             this.eggTimer--;
             if (this.eggTimer <= 0) {
-                this.eggTimer = 1800; // 30 секунд (при 60fps)
+                this.eggTimer = 1800;
                 traps.push({x: this.x, y: this.y, size: 10, active: true});
                 addBubble(this, phrasesEggDrop[Math.floor(Math.random() * phrasesEggDrop.length)], '#fcd34d');
             }
 
-            // Эмоции и лица
+            // Эмоции
             this.faceTimer--;
             if (this.faceTimer <= 0) {
-                this.faceTimer = 600; // Раз в 10 секунд (60 fps * 10)
+                this.faceTimer = 600; 
                 this.faceType = Math.floor(Math.random() * 10);
             }
 
@@ -607,15 +636,15 @@
                 this.weaponType = weapons[Math.floor(Math.random() * weapons.length)];
                 
                 if (this.weaponType === 'pistol') {
-                    this.shotsToFire = 3; // Выдать 3 пули
-                    this.shootCooldown = 30; // Небольшая задержка перед первым выстрелом
+                    this.shotsToFire = 3; 
+                    this.shootCooldown = 30;
                 } else if (this.weaponType === 'rifle') {
-                    this.shotsToFire = 6; // Выдать 6 пуль
+                    this.shotsToFire = 6; 
                     this.shootCooldown = 30;
                 } else if (this.weaponType === 'pitchfork') {
-                    this.dashFrames = 45; // Прыжок/рывок на 0.75 сек
+                    this.dashFrames = 45; 
                 } else if (this.weaponType === 'lasso') {
-                    this.shotsToFire = 1; // Одно лассо
+                    this.shotsToFire = 1; 
                     this.shootCooldown = 30;
                 }
 
@@ -625,10 +654,10 @@
                 }
             }
 
-            // Фразочки гуся раз в 10 секунд
+            // Фразочки
             this.phraseTimer--;
             if (this.phraseTimer <= 0) {
-                this.phraseTimer = 600; // 10 секунд
+                this.phraseTimer = 600; 
                 addBubble(this, phrasesGoose[Math.floor(Math.random() * phrasesGoose.length)], '#fcd34d');
             }
 
@@ -643,122 +672,105 @@
             ctx.translate(this.x - camera.x, this.y - camera.y);
             
             if (this.isDead) {
-                ctx.rotate(Math.PI / 2); // Валяется мертвым
+                ctx.rotate(Math.PI / 2);
             } else if (this.stunTimer > 0) {
-                // Остолбенел - дрожит
                 ctx.translate(Math.sin(frameCount) * 2, 0);
             }
             
-            // Анимация ходьбы
             let wobble = (this.isDead || this.stunTimer > 0) ? 0 : Math.sin(frameCount * 0.2) * 5;
             
-            // Тень
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.beginPath(); ctx.ellipse(0, 15, 15, 5, 0, 0, Math.PI*2); ctx.fill();
 
-            // Если игрок слева, поворачиваем гуся
             if (player.x < this.x) {
                 ctx.scale(-1, 1);
             }
             
             ctx.translate(0, wobble);
             
-            // Тело гуся
             ctx.fillStyle = '#ffffff';
             ctx.beginPath(); ctx.ellipse(-5, 5, 18, 12, 0, 0, Math.PI*2); ctx.fill();
             
-            // Крыло
             ctx.fillStyle = '#f3f4f6';
             ctx.beginPath(); ctx.ellipse(-8, 5, 10, 6, -Math.PI/6, 0, Math.PI*2); ctx.fill();
             
-            // Шея
             ctx.beginPath();
             ctx.moveTo(-5, -5);
             ctx.quadraticCurveTo(10, -10, 8, -25);
             ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff'; ctx.stroke();
             
-            // Голова
             ctx.beginPath(); ctx.arc(8, -25, 8, 0, Math.PI*2); ctx.fill();
             
-            // Клюв (меняется от эмоции)
             ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
-            if (this.faceType % 3 === 0) { // Открыт
+            if (this.faceType % 3 === 0) { 
                 ctx.moveTo(15, -28); ctx.lineTo(25, -25); ctx.lineTo(15, -22);
-            } else if (this.faceType % 3 === 1) { // Широко открыт
+            } else if (this.faceType % 3 === 1) { 
                 ctx.moveTo(15, -28); ctx.lineTo(25, -28); ctx.lineTo(15, -22);
-            } else { // Закрыт
+            } else { 
                 ctx.moveTo(15, -26); ctx.lineTo(23, -24); ctx.lineTo(15, -22);
             }
             ctx.fill();
             
-            // Глаз (меняется от эмоции)
             ctx.fillStyle = '#000000';
             let eyeX = 10; let eyeY = -28;
-            if (this.faceType === 0 || this.faceType === 1) { // Обычный
+            if (this.faceType === 0 || this.faceType === 1) { 
                 ctx.beginPath(); ctx.arc(eyeX, eyeY, 2, 0, Math.PI*2); ctx.fill();
-            } else if (this.faceType === 2) { // Злой (линия)
+            } else if (this.faceType === 2) { 
                 ctx.beginPath(); ctx.moveTo(eyeX-2, eyeY-2); ctx.lineTo(eyeX+2, eyeY); ctx.lineWidth=1.5; ctx.strokeStyle='#000'; ctx.stroke();
                 ctx.beginPath(); ctx.arc(eyeX, eyeY+1, 1.5, 0, Math.PI*2); ctx.fill();
-            } else if (this.faceType === 3) { // Удивленный
+            } else if (this.faceType === 3) { 
                 ctx.beginPath(); ctx.arc(eyeX, eyeY-1, 3, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(eyeX, eyeY-1, 1, 0, Math.PI*2); ctx.fill();
-            } else if (this.faceType === 4) { // Мертвый/пьяный
+            } else if (this.faceType === 4) { 
                 ctx.font = '8px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('x', eyeX, eyeY);
-            } else if (this.faceType === 5) { // Грустный
+            } else if (this.faceType === 5) { 
                 ctx.beginPath(); ctx.moveTo(eyeX-2, eyeY); ctx.lineTo(eyeX+2, eyeY-2); ctx.lineWidth=1.5; ctx.strokeStyle='#000'; ctx.stroke();
-            } else if (this.faceType === 6) { // Сердечко
+            } else if (this.faceType === 6) { 
                 ctx.fillStyle = 'red'; ctx.font = '8px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', eyeX, eyeY+2);
-            } else if (this.faceType === 7) { // Косой
+            } else if (this.faceType === 7) { 
                 ctx.beginPath(); ctx.arc(eyeX, eyeY, 2.5, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(eyeX-1, eyeY+1, 1, 0, Math.PI*2); ctx.fill();
-            } else if (this.faceType === 8) { // Спящий
+            } else if (this.faceType === 8) { 
                 ctx.beginPath(); ctx.moveTo(eyeX-2, eyeY); ctx.quadraticCurveTo(eyeX, eyeY+2, eyeX+2, eyeY); ctx.lineWidth=1; ctx.strokeStyle='#000'; ctx.stroke();
-            } else { // Квадратный
+            } else { 
                 ctx.fillRect(eyeX-1.5, eyeY-1.5, 3, 3);
             }
 
-            // Оружие в крыле/руке
             if (this.weaponType !== 'none') {
                 ctx.save();
                 ctx.translate(12, 5);
-                ctx.rotate(Math.sin(frameCount * 0.3) * 0.5); // Размахивает оружием
+                ctx.rotate(Math.sin(frameCount * 0.3) * 0.5); 
                 
                 if (this.weaponType === 'knife') {
-                    // Детализированный нож
-                    ctx.fillStyle = '#78350f'; ctx.fillRect(-2, -2, 6, 4); // Рукоятка
-                    ctx.fillStyle = '#d4d4d8'; ctx.fillRect(3, -4, 2, 8); // Гарда
-                    ctx.fillStyle = '#9ca3af'; // Лезвие
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(-2, -2, 6, 4); 
+                    ctx.fillStyle = '#d4d4d8'; ctx.fillRect(3, -4, 2, 8); 
+                    ctx.fillStyle = '#9ca3af'; 
                     ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(15, -2); ctx.lineTo(18, 0); ctx.lineTo(15, 2); ctx.lineTo(5, 2); ctx.fill();
-                    ctx.strokeStyle = '#f3f4f6'; ctx.beginPath(); ctx.moveTo(6, -1); ctx.lineTo(14, -1); ctx.stroke(); // Блик
+                    ctx.strokeStyle = '#f3f4f6'; ctx.beginPath(); ctx.moveTo(6, -1); ctx.lineTo(14, -1); ctx.stroke(); 
                 } else if (this.weaponType === 'pistol') {
-                    // Детализированный пистолет
-                    ctx.fillStyle = '#9ca3af'; ctx.fillRect(0, -3, 12, 4); // Ствол (серебро)
-                    ctx.fillStyle = '#1f2937'; ctx.fillRect(-2, -2, 5, 8); // Рукоятка (черная)
-                    ctx.strokeStyle = '#1f2937'; ctx.strokeRect(3, 1, 4, 3); // Скоба
+                    ctx.fillStyle = '#9ca3af'; ctx.fillRect(0, -3, 12, 4); 
+                    ctx.fillStyle = '#1f2937'; ctx.fillRect(-2, -2, 5, 8); 
+                    ctx.strokeStyle = '#1f2937'; ctx.strokeRect(3, 1, 4, 3); 
                 } else if (this.weaponType === 'fork') {
-                    // Детализированная вилка
                     ctx.strokeStyle = '#d4d4d8'; ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(6, 0); ctx.stroke(); // Ручка
-                    ctx.beginPath(); ctx.moveTo(6, -3); ctx.lineTo(6, 3); ctx.stroke(); // Основание зубцов
-                    for(let py=-3; py<=3; py+=2) { // 4 зубца
+                    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(6, 0); ctx.stroke(); 
+                    ctx.beginPath(); ctx.moveTo(6, -3); ctx.lineTo(6, 3); ctx.stroke(); 
+                    for(let py=-3; py<=3; py+=2) { 
                         ctx.beginPath(); ctx.moveTo(6, py); ctx.lineTo(12, py); ctx.stroke();
                     }
                 } else if (this.weaponType === 'rifle') {
-                    // Детализированный автомат
-                    ctx.fillStyle = '#78350f'; ctx.fillRect(-8, -2, 8, 5); // Приклад
-                    ctx.fillStyle = '#374151'; ctx.fillRect(0, -3, 8, 5); // Корпус
-                    ctx.fillStyle = '#111827'; ctx.fillRect(8, -2, 12, 3); // Ствол
-                    ctx.fillStyle = '#111827'; ctx.fillRect(2, -5, 6, 2); // Прицел
-                    ctx.fillStyle = '#1f2937'; ctx.fillRect(2, 2, 4, 6); // Магазин
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(-8, -2, 8, 5); 
+                    ctx.fillStyle = '#374151'; ctx.fillRect(0, -3, 8, 5); 
+                    ctx.fillStyle = '#111827'; ctx.fillRect(8, -2, 12, 3); 
+                    ctx.fillStyle = '#111827'; ctx.fillRect(2, -5, 6, 2); 
+                    ctx.fillStyle = '#1f2937'; ctx.fillRect(2, 2, 4, 6); 
                 } else if (this.weaponType === 'pitchfork') {
-                    // Вилы
-                    ctx.fillStyle = '#78350f'; ctx.fillRect(-10, -1, 20, 2); // Древко
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(-10, -1, 20, 2); 
                     ctx.strokeStyle = '#d4d4d8'; ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(10, 4); ctx.stroke(); // Основание вил
-                    for(let py=-4; py<=4; py+=4) { // 3 зубца
+                    ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(10, 4); ctx.stroke(); 
+                    for(let py=-4; py<=4; py+=4) { 
                         ctx.beginPath(); ctx.moveTo(10, py); ctx.lineTo(16, py); ctx.stroke();
                     }
                 } else if (this.weaponType === 'lasso') {
-                    // Скрученное лассо в крыле
                     ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 2;
                     ctx.beginPath(); ctx.ellipse(5, 0, 8, 4, 0, 0, Math.PI*2); ctx.stroke();
                     ctx.beginPath(); ctx.ellipse(5, -2, 7, 3, 0, 0, Math.PI*2); ctx.stroke();
@@ -778,7 +790,6 @@
             grasses = [];
             stones = [];
             
-            // Трава и камни для фона распределены по всей карте
             for(let i=0; i<400; i++) {
                 grasses.push({
                     x: WORLD_MIN_X + Math.random() * (WORLD_MAX_X - WORLD_MIN_X),
@@ -794,7 +805,6 @@
                 }
             }
 
-            // Спавн первых бутылок (недалеко от старта)
             for(let i=0; i<5 + level*2; i++) {
                 let nx = player.x + (Math.random() - 0.5) * 1500;
                 let ny = player.y + (Math.random() - 0.5) * 1500;
@@ -803,7 +813,6 @@
                 items.push({ x: nx, y: ny, size: 15 });
             }
 
-            // Спавн кустов и воды по всей карте
             if (level >= 3) {
                 let obsCount = level * 3;
                 for(let i=0; i<obsCount; i++) {
@@ -822,14 +831,12 @@
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
             
-            // Затемнение за картой
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(-10000, -10000, 10000 + WORLD_MIN_X, 20000); // Лево
-            ctx.fillRect(WORLD_MAX_X, -10000, 10000, 20000); // Право
-            ctx.fillRect(WORLD_MIN_X, -10000, WORLD_MAX_X - WORLD_MIN_X, 10000 + WORLD_MIN_Y); // Верх
-            ctx.fillRect(WORLD_MIN_X, WORLD_MAX_Y, WORLD_MAX_X - WORLD_MIN_X, 10000); // Низ
+            ctx.fillRect(-10000, -10000, 10000 + WORLD_MIN_X, 20000); 
+            ctx.fillRect(WORLD_MAX_X, -10000, 10000, 20000); 
+            ctx.fillRect(WORLD_MIN_X, -10000, WORLD_MAX_X - WORLD_MIN_X, 10000 + WORLD_MIN_Y); 
+            ctx.fillRect(WORLD_MIN_X, WORLD_MAX_Y, WORLD_MAX_X - WORLD_MIN_X, 10000); 
 
-            // Деревянный забор
             ctx.strokeStyle = '#8B4513';
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -837,7 +844,6 @@
             ctx.rect(WORLD_MIN_X - 10, WORLD_MIN_Y - 10, WORLD_MAX_X - WORLD_MIN_X + 20, WORLD_MAX_Y - WORLD_MIN_Y + 20);
             ctx.stroke();
 
-            // Столбики забора
             ctx.fillStyle = '#A0522D';
             const step = 150;
             for(let x = WORLD_MIN_X; x <= WORLD_MAX_X; x += step) {
@@ -853,13 +859,12 @@
         }
 
         static drawGround() {
-            // Рисуем травку
             ctx.strokeStyle = '#22c55e';
             ctx.lineWidth = 2;
             grasses.forEach(g => {
                 let gx = g.x - camera.x;
                 let gy = g.y - camera.y;
-                if(gx < -50 || gx > w+50 || gy < -50 || gy > h+50) return; // оптимизация
+                if(gx < -50 || gx > (w/ZOOM)+50 || gy < -50 || gy > (h/ZOOM)+50) return; 
                 ctx.beginPath();
                 ctx.moveTo(gx, gy);
                 if (g.type === 0) { ctx.lineTo(gx - 3, gy - 8); ctx.moveTo(gx, gy); ctx.lineTo(gx + 2, gy - 6); }
@@ -868,12 +873,11 @@
                 ctx.stroke();
             });
 
-            // Рисуем камушки
             ctx.fillStyle = '#6b7280';
             stones.forEach(s => {
                 let sx = s.x - camera.x;
                 let sy = s.y - camera.y;
-                if(sx < -50 || sx > w+50 || sy < -50 || sy > h+50) return;
+                if(sx < -50 || sx > (w/ZOOM)+50 || sy < -50 || sy > (h/ZOOM)+50) return;
                 ctx.beginPath(); ctx.ellipse(sx, sy, s.size, s.size*0.7, 0, 0, Math.PI*2); ctx.fill();
             });
         }
@@ -882,22 +886,20 @@
             items.forEach(item => {
                 let ix = item.x - camera.x;
                 let iy = item.y - camera.y;
-                
-                // Рисуем реалистичную бутылку Джека
                 ctx.save();
                 ctx.translate(ix, iy);
-                ctx.fillStyle = '#111827'; // Черное стекло
+                ctx.fillStyle = '#111827'; 
                 ctx.fillRect(-6, -10, 12, 18);
-                ctx.fillStyle = '#ffffff'; // Белая этикетка
+                ctx.fillStyle = '#ffffff'; 
                 ctx.fillRect(-5, -5, 10, 10);
-                ctx.fillStyle = '#000000'; // Текст JD
+                ctx.fillStyle = '#000000'; 
                 ctx.font = 'bold 6px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('JD', 0, 0);
-                ctx.fillStyle = '#d97706'; // Горлышко
+                ctx.fillStyle = '#d97706'; 
                 ctx.fillRect(-3, -16, 6, 6);
-                ctx.fillStyle = '#000000'; // Пробка
+                ctx.fillStyle = '#000000'; 
                 ctx.fillRect(-3.5, -18, 7, 3);
                 ctx.restore();
             });
@@ -916,7 +918,6 @@
         }
 
         static drawObstaclesBottom() {
-            // Рисуем воду (под игроком)
             obstacles.filter(o => o.type === 'water').forEach(obs => {
                 ctx.fillStyle = '#3b82f6';
                 ctx.beginPath();
@@ -929,20 +930,17 @@
         }
 
         static drawObstaclesTop() {
-            // Рисуем кусты (над игроком и гусями)
             obstacles.filter(o => o.type === 'bush').forEach(obs => {
                 ctx.fillStyle = '#166534';
                 ctx.beginPath();
                 ctx.arc(obs.x - camera.x, obs.y - camera.y, obs.size, 0, Math.PI*2);
                 ctx.fill();
-                // Детали куста
                 ctx.fillStyle = '#14532d';
                 ctx.beginPath(); ctx.arc(obs.x - camera.x - 10, obs.y - camera.y - 10, obs.size*0.5, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(obs.x - camera.x + 10, obs.y - camera.y + 5, obs.size*0.6, 0, Math.PI*2); ctx.fill();
             });
         }
     }
-
 
     // --- СИСТЕМА ДИАЛОГОВ И ЧАТА ---
     function addToChat(name, text, color) {
@@ -953,13 +951,11 @@
         msg.innerHTML = `<span style="color: ${color}">${name}:</span> ${text}`;
         chat.appendChild(msg);
 
-        // Удаляем старые сообщения
         setTimeout(() => {
             msg.style.opacity = '0';
             setTimeout(() => msg.remove(), 1000);
         }, 8000);
 
-        // Максимум 8 сообщений на экране
         while (chat.children.length > 8) {
             chat.removeChild(chat.firstChild);
         }
@@ -969,7 +965,7 @@
         bubbles.push({
             entity: entity,
             text: text,
-            life: 250,      // Увеличили длительность
+            life: 250,      
             maxLife: 250,
             color: color
         });
@@ -987,7 +983,6 @@
                 continue;
             }
 
-            // Привязка к объекту (сущности)
             let bx = b.entity.x - camera.x;
             let by = b.entity.y - (b.entity === player ? 50 : 40) - camera.y - (b.maxLife - b.life)*0.05;
 
@@ -999,13 +994,11 @@
             ctx.font = 'bold 16px Arial';
             let tw = ctx.measureText(b.text).width;
             
-            // Фон облачка
             ctx.beginPath();
             ctx.roundRect(bx - tw/2 - 10, by - 25, tw + 20, 30, 10);
             ctx.fill();
             ctx.stroke();
 
-            // Хвостик
             ctx.beginPath();
             ctx.moveTo(bx - 5, by + 5);
             ctx.lineTo(bx, by + 15);
@@ -1013,7 +1006,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Текст
             ctx.fillStyle = '#000';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -1056,7 +1048,6 @@
         if (gameState !== 'playing') return;
         let clientX, clientY;
         
-        // Надежное определение координат для ПК и мобильных
         if (e.touches && e.touches.length > 0) {
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
@@ -1103,7 +1094,7 @@
 
     function handleJoyMove(e) {
         if (!joyActive) return;
-        if (e.cancelable) e.preventDefault(); // Запрет скролла экрана при игре
+        if (e.cancelable) e.preventDefault(); 
         
         let clientX, clientY;
         if (e.touches && e.touches.length > 0) {
@@ -1123,7 +1114,7 @@
         let dx = clientX - centerX;
         let dy = clientY - centerY;
         let dist = Math.hypot(dx, dy);
-        let maxDist = rect.width / 2 - 25; // Ограничение ползунка
+        let maxDist = rect.width / 2 - 25; 
         
         if (dist > maxDist) {
             dx = (dx / dist) * maxDist;
@@ -1163,11 +1154,11 @@
 
         player = new Player();
         pointer = { x: w/2, y: h/2 };
-        geese = [new Goose(600, 600)]; // Первый гусь
+        geese = [new Goose(600, 600)]; 
         bubbles = [];
         particles = [];
         bullets = [];
-        document.getElementById('chatLog').innerHTML = ''; // Очистка чата
+        document.getElementById('chatLog').innerHTML = ''; 
         
         Environment.generateMap();
 
@@ -1184,17 +1175,20 @@
         document.getElementById('gameOverScreen').classList.remove('hidden');
         document.getElementById('roundBottles').innerText = bottlesCollectedThisRound;
         updateMenuStats();
+        
+        joyActive = false;
+        pointerActive = false;
+        joyData = { x: 0, y: 0 };
+        joyKnob.style.transform = `translate(-50%, -50%)`;
     }
 
     function spawnGeese() {
-        // Зависимость кол-ва гусей от уровня
         let targetGeese = 1 + Math.floor(level / 3);
-        if (level >= 11) targetGeese = 4; // Максимум гусей
+        if (level >= 11) targetGeese = 4; 
 
         while (geese.length < targetGeese) {
-            // Спавн вне экрана
             let angle = Math.random() * Math.PI * 2;
-            let dist = Math.max(w, h);
+            let dist = Math.max(w, h) / ZOOM;
             geese.push(new Goose(player.x + Math.cos(angle)*dist, player.y + Math.sin(angle)*dist));
         }
     }
@@ -1204,15 +1198,12 @@
         frameCount++;
 
         player.update();
-        
         geese.forEach(goose => goose.update());
         spawnGeese();
 
-        // Сбор бутылок и магия Акцио
         for (let i = items.length - 1; i >= 0; i--) {
             let item = items[i];
             
-            // Если бутылка притягивается заклинанием
             if (item.isAccio) {
                 let dx = player.x - item.x;
                 let dy = player.y - item.y;
@@ -1229,13 +1220,11 @@
                 player.drunkLevel += 1;
                 createParticles(item.x, item.y, '#f59e0b');
                 
-                // Спавн новой бутылки за экраном, чтобы всегда были на карте
                 let angle = Math.random() * Math.PI * 2;
-                let dist = Math.max(w, h) / 2 + 150 + Math.random() * 300; // Спавн за пределами видимости
+                let dist = Math.max(w, h) / ZOOM / 2 + 150 + Math.random() * 300;
                 let nx = player.x + Math.cos(angle) * dist;
                 let ny = player.y + Math.sin(angle) * dist;
                 
-                // Удерживаем новую бутылку строго в пределах забора
                 nx = Math.max(WORLD_MIN_X + 20, Math.min(WORLD_MAX_X - 20, nx));
                 ny = Math.max(WORLD_MIN_Y + 20, Math.min(WORLD_MAX_Y - 20, ny));
                 items.push({ x: nx, y: ny, size: 15 });
@@ -1246,10 +1235,9 @@
 
                 updateHUD();
 
-                // Повышение уровня каждые 10 бутылок и трезвление
                 if (bottlesCollectedThisRound > 0 && bottlesCollectedThisRound % 10 === 0) {
                     level++;
-                    player.drunkLevel = 0; // Трезвеет!
+                    player.drunkLevel = 0; 
                     updateHUD();
                     Environment.generateMap(); 
                     
@@ -1257,38 +1245,28 @@
                     introText = `Уровень ${level}! Яра протрезвела!`;
                     addBubble(player, "Ух, отпустило! Идём дальше!", '#a78bfa');
                 } 
-                // Спотыкание каждые 5 бутылок
                 else if (bottlesCollectedThisRound % 5 === 0) {
-                    player.fallenTimer = 60; // 1 секунда (при 60fps)
+                    player.fallenTimer = 60; 
                     let fallPhrase = phrasesFall[Math.floor(Math.random() * phrasesFall.length)];
                     addBubble(player, fallPhrase, '#fca5a5');
                 }
             }
         }
 
-        // Ловушки (яйца)
         traps.forEach(trap => {
             if (trap.active && Math.hypot(player.x - trap.x, player.y - trap.y) < player.size + trap.size) {
                 trap.active = false;
-                player.fallenTimer = 60; // Яра падает
+                player.fallenTimer = 60;
                 createParticles(trap.x, trap.y, '#fef08a');
                 addBubble(player, phrasesEggStep[Math.floor(Math.random() * phrasesEggStep.length)], '#fca5a5');
             }
         });
 
-        // Реакция на близость гуся
-        geese.forEach(goose => {
-            if (Math.hypot(player.x - goose.x, player.y - goose.y) < 150 && Math.random() < 0.005) {
-                 addBubble(player, phrasesScared[Math.floor(Math.random() * phrasesScared.length)], '#fca5a5');
-            }
-        });
-
-        // Взаимодействие гусей друг с другом
         for (let i = 0; i < geese.length; i++) {
             for (let j = i + 1; j < geese.length; j++) {
                 let g1 = geese[i];
                 let g2 = geese[j];
-                if (g1.isDead || g2.isDead) continue; // Мертвые не болтают
+                if (g1.isDead || g2.isDead) continue; 
                 if (g1.talkCooldown <= 0 && g2.talkCooldown <= 0 && Math.hypot(g1.x - g2.x, g1.y - g2.y) < 100) {
                     addBubble(g1, `Привет, ${g2.name}!`, '#6ee7b7');
                     addBubble(g2, `Здарова, ${g1.name}!`, '#6ee7b7');
@@ -1298,17 +1276,15 @@
             }
         }
 
-        // Обновление пуль и лассо
         for (let i = bullets.length - 1; i >= 0; i--) {
             let b = bullets[i];
             b.x += b.vx;
             b.y += b.vy;
             b.life--;
             
-            // Проверка попадания в Яру
             if (Math.hypot(player.x - b.x, player.y - b.y) < player.size + 5) {
                 if (b.type === 'lasso') {
-                    player.fallenTimer = 60; // Яра падает от лассо
+                    player.fallenTimer = 60; 
                     addBubble(player, phrasesLassoHit[Math.floor(Math.random() * phrasesLassoHit.length)], '#fca5a5');
                 } else {
                     triggerGameOver();
@@ -1322,17 +1298,14 @@
     }
 
     function draw() {
-        // Очистка и фон
         ctx.fillStyle = '#4ade80';
         ctx.fillRect(0, 0, w, h);
 
         if (gameState !== 'playing') return;
 
-        // Применяем отдаление камеры
         ctx.save();
         ctx.scale(ZOOM, ZOOM);
 
-        // Рисуем сетку земли для понимания движения
         ctx.save();
         ctx.translate(-camera.x % 100, -camera.y % 100);
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -1343,13 +1316,12 @@
         }
         ctx.restore();
 
-        Environment.drawGround(); // Травка и камни
-        Environment.drawFence(); // Отрисовка забора и границ
+        Environment.drawGround(); 
+        Environment.drawFence(); 
         Environment.drawObstaclesBottom();
         Environment.drawTraps();
         Environment.drawItems();
         
-        // Рисуем сущности с сортировкой по Y для правильного перекрытия
         let entities = [{obj: player, type: 'player'}, ...geese.map(g => ({obj: g, type: 'goose'}))];
         entities.sort((a, b) => a.obj.y - b.obj.y);
         
@@ -1358,26 +1330,22 @@
             else ent.obj.draw();
         });
 
-        // Рисуем пули и лассо
         bullets.forEach(b => {
             if (b.type === 'lasso') {
                 ctx.strokeStyle = '#8B4513';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                // Раскрученная петля
                 ctx.ellipse(b.x - camera.x, b.y - camera.y, 12, 6, frameCount * 0.2, 0, Math.PI*2);
                 ctx.stroke();
-                // Веревочка
                 ctx.beginPath();
                 ctx.moveTo(b.x - camera.x, b.y - camera.y);
                 ctx.lineTo(b.x - b.vx*4 - camera.x, b.y - b.vy*4 - camera.y);
                 ctx.stroke();
             } else {
-                ctx.fillStyle = '#fef08a'; // Желтая пулька
+                ctx.fillStyle = '#fef08a'; 
                 ctx.beginPath(); 
                 ctx.arc(b.x - camera.x, b.y - camera.y, 4, 0, Math.PI*2); 
                 ctx.fill();
-                // Огненный след
                 ctx.fillStyle = '#ef4444';
                 ctx.beginPath();
                 ctx.arc(b.x - b.vx - camera.x, b.y - b.vy - camera.y, 2, 0, Math.PI*2);
@@ -1385,13 +1353,12 @@
             }
         });
 
-        Environment.drawObstaclesTop(); // Кусты поверх игроков
+        Environment.drawObstaclesTop(); 
         drawParticles();
         drawBubbles();
         
-        ctx.restore(); // Сбрасываем ZOOM, чтобы элементы интерфейса рисовались в оригинальном размере
+        ctx.restore(); 
 
-        // Интро гуся
         if (introTimer > 0) {
             introTimer--;
             ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(introTimer / 30, 0.5)})`;
@@ -1406,7 +1373,6 @@
             ctx.strokeText(introText, w/2, h/2);
         }
 
-        // Визуализация пьяного эффекта по краям экрана
         if (player && player.drunkLevel > 0) {
             let opacity = Math.min(player.drunkLevel * 0.02, 0.4);
             ctx.fillStyle = `rgba(139, 92, 246, ${opacity})`;
@@ -1451,7 +1417,6 @@
         let item = shopItems.find(i => i.id === id);
         
         if (!inventory.includes(id)) {
-            // Покупка
             if (globalBottles >= item.cost) {
                 globalBottles -= item.cost;
                 inventory.push(id);
@@ -1464,16 +1429,15 @@
             }
         }
         
-        // Экипировка
         if (inventory.includes(id)) {
             if (item.type === 'skin') {
                 equippedSkin = id;
                 localStorage.setItem('yara_equippedSkin', id);
             } else if (item.type === 'vehicle') {
-                equippedVehicle = equippedVehicle === id ? 'none' : id; // Снять/Одеть
+                equippedVehicle = equippedVehicle === id ? 'none' : id; 
                 localStorage.setItem('yara_equippedVehicle', equippedVehicle);
             } else if (item.type === 'wand') {
-                equippedWand = equippedWand === id ? 'none' : id; // Снять/Одеть
+                equippedWand = equippedWand === id ? 'none' : id; 
                 localStorage.setItem('yara_equippedWand', equippedWand);
             }
         }
@@ -1499,7 +1463,6 @@
             const div = document.createElement('div');
             div.className = 'shop-item';
             
-            // Визуализация цвета платья или иконка
             let iconHtml = '';
             if(item.type === 'skin') {
                 iconHtml = `<div style="width: 40px; height: 40px; background-color: ${item.color}; margin: 0 auto; border-radius: 5px; border: 2px solid #000;"></div>`;
@@ -1521,7 +1484,6 @@
         });
     }
 
-    // Инициализация при старте
     updateMenuStats();
     requestAnimationFrame(loop);
 
